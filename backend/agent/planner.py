@@ -6,6 +6,35 @@ from groq import Groq
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
+def normalize_plan_output(parsed):
+    if not isinstance(parsed, dict):
+        raise ValueError("AI plan must be a JSON object")
+
+    steps = parsed.get("steps")
+    if isinstance(steps, list):
+        normalized_steps = [step for step in steps if isinstance(step, dict)]
+        if normalized_steps:
+            parsed["steps"] = normalized_steps
+            return parsed
+
+    nested_plan = parsed.get("plan")
+    if isinstance(nested_plan, dict):
+        nested_steps = nested_plan.get("steps")
+        if isinstance(nested_steps, list) and nested_steps:
+            return {"steps": [step for step in nested_steps if isinstance(step, dict)]}
+
+    if isinstance(parsed.get("action"), str):
+        single_step = {
+            key: value
+            for key, value in parsed.items()
+            if key not in {"plan", "steps"}
+        }
+        return {"steps": [single_step]}
+
+    raise ValueError(
+        "AI plan must include a steps array or a single action object")
+
+
 def plan_task(user_prompt: str):
     try:
         response = client.chat.completions.create(
@@ -14,6 +43,9 @@ def plan_task(user_prompt: str):
                 {
                     "role": "system",
                     "content": """You are a browser automation agent. Convert user requests into detailed JSON action plans.
+
+Always return a JSON object in this exact shape:
+{"steps": [{"action": "...", "...": "..."}]}
 
 Actions:
 - goto: {"action": "goto", "url": "https://..."}
@@ -54,8 +86,9 @@ Output ONLY valid JSON with no additional text or markdown."""
         print(f"AI Response: {content}")
 
         parsed = json.loads(content)
-        print(f"Parsed plan: {json.dumps(parsed, indent=2)}")
-        return parsed
+        normalized = normalize_plan_output(parsed)
+        print(f"Parsed plan: {json.dumps(normalized, indent=2)}")
+        return normalized
 
     except json.JSONDecodeError as e:
         print(f"❌ Failed to parse JSON from AI: {str(e)}")
