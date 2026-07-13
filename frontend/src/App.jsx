@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CommandBox from "./components/CommandBox";
 import Logs from "./components/Logs";
 
@@ -9,6 +9,32 @@ export default function App() {
   const [plan, setPlan] = useState(null);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [backendStatus, setBackendStatus] = useState("checking");
+
+  // Check backend health on mount
+  useEffect(() => {
+    checkBackendHealth();
+  }, []);
+
+  const checkBackendHealth = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/health`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!res.ok) {
+        setBackendStatus(`offline (${res.status})`);
+        return;
+      }
+
+      const data = await res.json();
+      setBackendStatus(data.groq_configured ? "ready" : "no-api-key");
+    } catch (error) {
+      setBackendStatus("unreachable");
+      console.error("Health check failed:", error);
+    }
+  };
 
   const runAgent = async (command) => {
     setLoading(true);
@@ -55,6 +81,7 @@ export default function App() {
       setLogs([
         "❌ Frontend Error: " + errorMsg,
         `Backend URL: ${BACKEND_URL}`,
+        `Backend Status: ${backendStatus}`,
       ]);
     } finally {
       setLoading(false);

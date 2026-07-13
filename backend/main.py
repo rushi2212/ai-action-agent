@@ -7,13 +7,24 @@ import json
 import os
 
 # Check for required environment variables
-if not os.getenv("GROQ_API_KEY"):
+groq_api_key = os.getenv("GROQ_API_KEY")
+if not groq_api_key:
     print("⚠️  WARNING: GROQ_API_KEY is not set!")
+    print("The backend will fail when trying to process commands.")
+else:
+    print("✅ GROQ_API_KEY is configured")
 
-from agent.planner import plan_task
-from agent.executer import execute_plan
+# Import after environment checks
+try:
+    from agent.planner import plan_task
+    from agent.executer import execute_plan
+    print("✅ Agent modules imported successfully")
+except Exception as e:
+    print(f"❌ Error importing agent modules: {e}")
+    import traceback
+    traceback.print_exc()
 
-app = FastAPI()
+app = FastAPI(title="AI Action Agent", version="1.0.0")
 
 # Add CORS middleware FIRST (before all routes)
 app.add_middleware(
@@ -34,8 +45,8 @@ class Command(BaseModel):
 async def global_exception_handler(request: Request, exc: Exception):
     error_details = {
         "logs": [
-            f"❌ Backend Error: {str(exc)}",
-            "Traceback:",
+            f"❌ Backend Error: {type(exc).__name__}",
+            str(exc),
             traceback.format_exc()
         ],
         "plan": None,
@@ -55,21 +66,25 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-@app.get("/health")
-def health_check():
+@app.get("/")
+def root():
     return {
-        "status": "ok",
-        "message": "Backend is running",
-        "groq_configured": bool(os.getenv("GROQ_API_KEY"))
+        "name": "AI Action Agent Backend",
+        "version": "1.0.0",
+        "endpoints": {
+            "health": "/health",
+            "run": "/run (POST)",
+            "docs": "/docs"
+        }
     }
 
 
-@app.post("/run")
-def run_agent(cmd: Command):
-    logs = []
-
-    def log(msg):
-        logs.append(msg)
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok", 
+        "message": "Backend is running",
+        "groq_configured": bool(groq_api_key)
         print(msg)  # Also print to server logs
 
     try:
