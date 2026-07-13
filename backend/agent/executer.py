@@ -1,17 +1,25 @@
 from playwright.sync_api import sync_playwright
 import time
+import os
 
 
 def execute_plan(plan, log):
     extracted_data = []
 
+    # Use headless mode for production (Render, etc)
+    is_production = os.getenv("RENDER", False) or os.getenv("VERCEL", False)
+    headless_mode = is_production or os.getenv(
+        "HEADLESS", "false").lower() == "true"
+
     with sync_playwright() as p:
         # Launch browser with more realistic settings
         browser = p.chromium.launch(
-            headless=False,
+            headless=headless_mode,
             args=[
                 '--start-maximized',
-                '--disable-blink-features=AutomationControlled'
+                '--disable-blink-features=AutomationControlled',
+                '--no-sandbox',
+                '--disable-setuid-sandbox'
             ]
         )
         context = browser.new_context(
