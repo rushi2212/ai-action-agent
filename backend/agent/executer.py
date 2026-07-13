@@ -3,13 +3,16 @@ import time
 import os
 
 
+def env_flag(name, default="false"):
+    return os.getenv(name, default).strip().lower() == "true"
+
+
 def execute_plan(plan, log):
     extracted_data = []
 
     # Use headless mode for production (Render, etc)
-    is_production = os.getenv("RENDER", False) or os.getenv("VERCEL", False)
-    headless_mode = is_production or os.getenv(
-        "HEADLESS", "false").lower() == "true"
+    is_production = env_flag("RENDER") or env_flag("VERCEL")
+    headless_mode = is_production or env_flag("HEADLESS")
 
     with sync_playwright() as p:
         # Launch browser with more realistic settings
