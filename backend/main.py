@@ -1,9 +1,12 @@
-from agent.executer import execute_plan
-from agent.planner import plan_task
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import traceback
+import os
+
+from agent.planner import plan_task
+from agent.executer import execute_plan
 
 app = FastAPI()
 
@@ -19,6 +22,20 @@ app.add_middleware(
 
 class Command(BaseModel):
     command: str
+
+
+# Global exception handler to return JSON for all errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "logs": [f"❌ Error: {str(exc)}", traceback.format_exc()],
+            "plan": None,
+            "results": [],
+            "error": str(exc)
+        },
+    )
 
 
 @app.get("/health")
