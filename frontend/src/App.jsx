@@ -2,6 +2,8 @@ import { useState } from "react";
 import CommandBox from "./components/CommandBox";
 import Logs from "./components/Logs";
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+
 export default function App() {
   const [logs, setLogs] = useState([]);
   const [plan, setPlan] = useState(null);
@@ -15,13 +17,13 @@ export default function App() {
     setResults([]);
 
     try {
-      const res = await fetch("https://ai-action-agent.onrender.com/run", {
+      const res = await fetch(`${BACKEND_URL}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command }),
       });
       const data = await res.json();
-      setLogs(data.logs);
+      setLogs(data.logs || []);
       if (data.plan) setPlan(data.plan);
       if (data.results) setResults(data.results);
     } catch (error) {
