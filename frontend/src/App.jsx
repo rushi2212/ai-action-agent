@@ -15,7 +15,7 @@ export default function App() {
     setResults([]);
 
     try {
-      const res = await fetch("http://localhost:8000/run", {
+      const res = await fetch("https://ai-action-agent.onrender.com/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command }),
