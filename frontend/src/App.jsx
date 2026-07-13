@@ -2,7 +2,30 @@ import { useState, useEffect } from "react";
 import CommandBox from "./components/CommandBox";
 import Logs from "./components/Logs";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
+function resolveBackendUrl(rawValue) {
+  const fallback = "http://localhost:8000";
+
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const normalized = String(rawValue)
+    .trim()
+    .replace(/^VITE_BACKEND_URL=/, "")
+    .split(/\s+/)[0];
+
+  if (!normalized) {
+    return fallback;
+  }
+
+  if (/^https?:\/\//i.test(normalized)) {
+    return normalized.replace(/\/$/, "");
+  }
+
+  return `https://${normalized.replace(/\/$/, "")}`;
+}
+
+const BACKEND_URL = resolveBackendUrl(import.meta.env.VITE_BACKEND_URL);
 
 export default function App() {
   const [logs, setLogs] = useState([]);
@@ -61,7 +84,7 @@ export default function App() {
       let data;
       try {
         data = JSON.parse(text);
-      } catch (parseError) {
+      } catch {
         console.error("Response text:", text.substring(0, 200));
         throw new Error(
           `Backend returned invalid JSON: ${text.substring(0, 100)}`,
