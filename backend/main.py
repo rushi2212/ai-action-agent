@@ -4,6 +4,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import traceback
 import json
+import os
+
+# Check for required environment variables
+if not os.getenv("GROQ_API_KEY"):
+    print("⚠️  WARNING: GROQ_API_KEY is not set!")
 
 from agent.planner import plan_task
 from agent.executer import execute_plan
@@ -52,7 +57,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "message": "Backend is running"}
+    return {
+        "status": "ok",
+        "message": "Backend is running",
+        "groq_configured": bool(os.getenv("GROQ_API_KEY"))
+    }
 
 
 @app.post("/run")
@@ -64,15 +73,17 @@ def run_agent(cmd: Command):
         print(msg)  # Also print to server logs
 
     try:
+        # Validate API key
+        if not os.getenv("GROQ_API_KEY"):
+            raise ValueError("GROQ_API_KEY environment variable is not set")
+
         log(f"🤖 Received command: {cmd.command}")
 
         plan = plan_task(cmd.command)
-        log(f"✅ Plan created with {len(plan.get('steps', []))} steps")
 
-        extracted_data = execute_plan(plan, log)
+        if not plan or "steps" not in plan:
+            raise ValueError("Invalid plan returned from AI")
 
-        response = {
-            "logs": logs,
             "plan": plan,
             "results": extracted_data,
             "success": True

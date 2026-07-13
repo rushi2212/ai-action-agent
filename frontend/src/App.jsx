@@ -22,12 +22,40 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ command }),
       });
-      const data = await res.json();
-      setLogs(data.logs || []);
+
+      // Check if response is ok
+      if (!res.ok) {
+        throw new Error(`Backend returned ${res.status}: ${res.statusText}`);
+      }
+
+      // Get the response text first to debug
+      const text = await res.text();
+
+      // Try to parse as JSON
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error("Response text:", text.substring(0, 200));
+        throw new Error(
+          `Backend returned invalid JSON: ${text.substring(0, 100)}`,
+        );
+      }
+
+      setLogs((data.logs || []).filter((log) => log));
       if (data.plan) setPlan(data.plan);
       if (data.results) setResults(data.results);
+
+      if (!data.success && data.error) {
+        setLogs((prev) => [...prev, `❌ ${data.error}`]);
+      }
     } catch (error) {
-      setLogs(["❌ Error: " + error.message]);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("Frontend error:", errorMsg);
+      setLogs([
+        "❌ Frontend Error: " + errorMsg,
+        `Backend URL: ${BACKEND_URL}`,
+      ]);
     } finally {
       setLoading(false);
     }
