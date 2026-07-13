@@ -82,29 +82,41 @@ def root():
 @app.get("/health")
 def health_check():
     return {
-        "status": "ok", 
+        "status": "ok",
         "message": "Backend is running",
-        "groq_configured": bool(groq_api_key)
-        print(msg)  # Also print to server logs
+        "groq_configured": bool(groq_api_key),
+    }
+
+
+@app.post("/run")
+def run_command(cmd: Command):
+    logs = []
+
+    def log(msg: str):
+        print(msg)
+        logs.append(msg)
 
     try:
-        # Validate API key
         if not os.getenv("GROQ_API_KEY"):
             raise ValueError("GROQ_API_KEY environment variable is not set")
 
         log(f"🤖 Received command: {cmd.command}")
+        log("🧠 Planning task...")
 
         plan = plan_task(cmd.command)
-
         if not plan or "steps" not in plan:
             raise ValueError("Invalid plan returned from AI")
 
+        log(f"📋 Generated plan with {len(plan['steps'])} step(s)")
+        extracted_data = execute_plan(plan, log)
+
+        response = {
+            "logs": logs,
             "plan": plan,
             "results": extracted_data,
-            "success": True
+            "success": True,
         }
 
-        # Ensure response is JSON serializable
         return json.loads(json.dumps(response, default=str))
 
     except ValueError as e:
@@ -115,7 +127,7 @@ def health_check():
             "plan": None,
             "results": [],
             "error": str(e),
-            "success": False
+            "success": False,
         }
     except Exception as e:
         error_msg = f"❌ Error: {str(e)}"
@@ -133,5 +145,5 @@ def health_check():
             "results": [],
             "error": str(e),
             "type": type(e).__name__,
-            "success": False
+            "success": False,
         }
