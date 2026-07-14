@@ -1,9 +1,56 @@
 import os
 import json
 import re
+from urllib.parse import quote_plus
 from groq import Groq
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+
+SHOPPING_INTENT_RE = re.compile(
+    r"\b(buy|purchase|shop|shopping|price|prices|cheap|cheapest|best|top|under|budget|deal|deals|amazon|flipkart|product|products|phone|phones|smartphone|smartphones|laptop|laptops|tablet|tablets|watch|watches|headphone|headphones|earphone|earphones|tv|television|camera|shoes|shoe|sneaker|sneakers)\b",
+    re.IGNORECASE,
+)
+
+
+def build_direct_search_plan(user_prompt: str):
+    normalized_prompt = " ".join(user_prompt.split()).strip()
+    if not normalized_prompt or not SHOPPING_INTENT_RE.search(normalized_prompt):
+        return None
+
+    prompt_lower = normalized_prompt.lower()
+    search_term = quote_plus(normalized_prompt)
+
+    if "flipkart" in prompt_lower:
+        search_url = f"https://www.flipkart.com/search?q={search_term}"
+        result_selector = "a._1fQZEK, a[href*='/p/']"
+    else:
+        search_url = f"https://www.amazon.in/s?k={search_term}"
+        result_selector = "[data-component-type='s-search-result'] a.a-link-normal"
+
+    plan = {
+        "steps": [
+            {
+                "action": "goto",
+                "url": search_url,
+            },
+            {
+                "action": "wait_for_selector",
+                "selector": result_selector,
+                "timeout": 15000,
+            },
+        ]
+    }
+
+    if any(keyword in prompt_lower for keyword in ("open", "view", "details", "browse", "compare", "select", "choose")):
+        plan["steps"].append(
+            {
+                "action": "click",
+                "selector": result_selector,
+            }
+        )
+
+    return plan
 
 
 def normalize_plan_output(parsed):
@@ -36,6 +83,11 @@ def normalize_plan_output(parsed):
 
 
 def plan_task(user_prompt: str):
+    direct_plan = build_direct_search_plan(user_prompt)
+    if direct_plan is not None:
+        print(f"Direct search plan: {json.dumps(direct_plan, indent=2)}")
+        return direct_plan
+
     try:
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -46,6 +98,8 @@ def plan_task(user_prompt: str):
 
 Always return a JSON object in this exact shape:
 {"steps": [{"action": "...", "...": "..."}]}
+
+Prefer direct destination URLs over navigating through search inputs. For shopping and product queries, go straight to Amazon or Flipkart search URLs when possible instead of opening Google and typing into the search box.
 
 Actions:
 - goto: {"action": "goto", "url": "https://..."}
